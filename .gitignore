@@ -1,0 +1,38 @@
+# Node.js (React)
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+.pnpm-debug.log
+.next/
+out/
+dist/
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.env
+.venv/
+venv/
+Pipfile.lock
+poetry.lock
+
+# Logs e arquivos temporários
+*.log
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Configurações do IDE/Editor
+.vscode/
+.idea/
+*.iml
+
+# Git
+.git/
+.gitmodules
