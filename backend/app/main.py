@@ -209,7 +209,7 @@ async def criar_pagamento_pix(payment_data: dict, db=Depends(get_db)):
         
         if payment_result["status"] == 201:
             payment_id = payment_result["response"]["id"]
-            return {"payment_id": payment_id, "status": payment_result["response"]["status"]}
+            return {"payment_id": payment_id, "status": payment_result["response"]["status"], "qr_code_base64": payment_result["response"]["point_of_interaction"]["transaction_data"]["qr_code_base64"]}
         else:
             logger.error(f"Erro ao criar pagamento via PIX: {payment_result}")
             raise HTTPException(status_code=500, detail="Erro ao criar pagamento via PIX")
@@ -241,15 +241,18 @@ async def status_compra(external_reference: str, db=Depends(get_db)):
 
         # Here, you can fetch the status from Mercado Pago with the external_reference
         payment_info = mp.payment().search({"external_reference": external_reference})
-
+        logger.info(f"Payment info: {payment_info}")
         if payment_info["status"] == 200 and payment_info["response"]["results"]:
             latest_payment = payment_info["response"]["results"][0]
             status = latest_payment.get("status", "undefined")
             qr_code = None
+            qr_code_base64 = None
 
             # Check if the payment is via PIX and include the QR Code
             if latest_payment.get("point_of_interaction"):
                 qr_code = latest_payment["point_of_interaction"].get("transaction_data", {}).get("qr_code")
+                qr_code_base64 = latest_payment["point_of_interaction"].get("transaction_data", {}).get("qr_code_base64")
+
             
             # Update the database with the status and QR code (if it exists)
             db.purchases.update_one(
@@ -263,8 +266,10 @@ async def status_compra(external_reference: str, db=Depends(get_db)):
             )
 
             logger.info(f"Updated purchase status: {status}, QR code: {'Present' if qr_code else 'Not present'}")
-            return {"status": status, "qr_code": qr_code}
+            return {"status": status, "qr_code": qr_code, "qr_code_base64": qr_code_base64}  # Return the status and QR code (if it exists)
+            
         else:
+
             logger.info(f"No payment info found, returning purchase status from database: {purchase['status']}")
             return {"status": purchase["status"], "qr_code": None}  # Return the purchase status from the database
 
