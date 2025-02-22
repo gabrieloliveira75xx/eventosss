@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { CalendarDays, Heart, Home, MapPin, Mail } from "lucide-react"
@@ -7,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Background } from "@/components/background"
 import { TicketSidebar } from "@/components/ticket-sidebar"
-import type React from "react"
 
 const EventDetails = ({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) => (
   <div className="flex items-center gap-2 text-gray-300">
@@ -24,7 +24,13 @@ export default function EventPage() {
   const scrollToTickets = () => {
     const ticketSection = document.getElementById("ticket-section")
     if (ticketSection) {
-      ticketSection.scrollIntoView({ behavior: "smooth" })
+      const offset = 80 // Adjust this value to fine-tune the scroll position
+      const elementPosition = ticketSection.getBoundingClientRect().top
+      const offsetPosition = elementPosition + window.pageYOffset - offset
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      })
     }
   }
 
@@ -45,7 +51,7 @@ export default function EventPage() {
                 className="rounded-full bg-white text-black hover:bg-white/90"
                 onClick={scrollToTickets}
               >
-                Comprar Ingresso
+                Comprar convite
               </Button>
             </div>
           </div>
@@ -65,7 +71,7 @@ export default function EventPage() {
               <EventDetails icon={MapPin}>Av. Brasil, 571 - Vila Rezende, Piracicaba - SP</EventDetails>
               <div className="flex flex-wrap gap-4">
                 <Button size="lg" className="rounded-full" onClick={scrollToTickets}>
-                  INGRESSOS A PARTIR DE R$ 20,00
+                  Convites a partir de R$25,00
                 </Button>
                 <Button
                   variant="outline"
@@ -79,9 +85,12 @@ export default function EventPage() {
               </div>
               <p className="text-sm text-gray-400">312 têm interesse</p>
             </div>
-            <div className="relative w-full h-full overflow-hidden rounded-lg mx-auto" style={{ aspectRatio: '1080 / 1350', maxWidth: '500px' }}>
+            <div
+              className="relative w-full h-full overflow-hidden rounded-lg mx-auto"
+              style={{ aspectRatio: "1080 / 1350", maxWidth: "500px" }}
+            >
               <Image
-                src="/remember.avif"
+                src="/remember.png"
                 alt="Remember Anos 70/80/90/2000"
                 fill
                 className="object-cover"
@@ -102,12 +111,10 @@ export default function EventPage() {
               <div className="flex items-start gap-4">
                 <div className="text-yellow-400 text-2xl">🎟️</div>
                 <div>
-                  <h2 className="text-lg font-bold mb-2 text-white">
-                    Garanta seu ingresso agora! Ingressos limitados.
-                  </h2>
+                  <h2 className="text-lg font-bold mb-2 text-white">Garanta seu convite agora! convites limitados.</h2>
                   <p className="text-gray-400 text-sm">
-                    Não perca essa oportunidade única! Adquira já seu ingresso para o evento exclusivo. Corra, os
-                    ingressos são limitados!
+                    Não perca essa oportunidade única! Adquira já seu convite para o evento exclusivo. Corra, os convite
+                    são limitados!
                   </p>
                 </div>
               </div>
@@ -124,19 +131,20 @@ export default function EventPage() {
               <SectionTitle>Line-up</SectionTitle>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {[
-                  { name: "DJ Guto Loureiro", location: "Santa Catarina", image: "/dj-guto-loureiro.avif" },
-                  { name: "DJ Paulo Oexer", location: "Santa Catarina", image: "/dj-paulo-oexer.avif" },
-                  { name: "DJ Zangão", location: "Rio das Pedras", image: "/dj-zangao.avif" },
+                  { name: "DJ Guto Loureiro", location: "Atração nacional", image: "/dj-guto-loureiro.png" },
+                  { name: "DJ Paulo Oexler", location: "Santa Catarina", image: "/dj-paulo-oexer.png" },
+                  { name: "DJ Zangão", location: "Rio das Pedras", image: "/dj-zangao.png" },
                 ].map((dj) => (
                   <div key={dj.name} className="space-y-2">
                     <div className="aspect-square overflow-hidden rounded-lg">
                       <Image
-                        src={dj.image || "/placeholder.svg"}
+                        src={dj.image || "/placeholder.png"}
                         alt={dj.name}
                         width={200}
                         height={200}
                         className="object-cover"
                         sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                        layout="intrinsic"
                       />
                     </div>
                     <p className="text-sm text-gray-300">{dj.name}</p>
@@ -168,8 +176,19 @@ export default function EventPage() {
                     </div>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-full bg-white text-black hover:bg-white/90">
-                  SEGUIR
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full bg-white text-black hover:bg-white/90"
+                  asChild
+                >
+                  <Link
+                    href="https://www.facebook.com/profile.php?id=61573071087463"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    SEGUIR
+                  </Link>
                 </Button>
               </div>
             </section>
@@ -178,7 +197,7 @@ export default function EventPage() {
             <section className="bg-black/20 p-4 sm:p-6 rounded-lg backdrop-blur-sm">
               <SectionTitle>Estilos</SectionTitle>
               <div className="flex flex-wrap gap-2">
-                {["DISCO", "DANCE", "ANOS 70", "ANOS 80", "ANOS 90", "ANOS 2000"].map((tag) => (
+                {["HOUSE", "BLACK", "CHARME", "EURODANCE", "ANOS 70", "ANOS 80", "ANOS 90", "ANOS 2000"].map((tag) => (
                   <Button
                     key={tag}
                     variant="outline"
@@ -211,7 +230,7 @@ export default function EventPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium hover:underline"
-                    >
+                  >
                     Av. Brasil, 571 - Vila Rezende, Piracicaba - SP, 13414-220
                   </a>
                 </EventDetails>
@@ -222,20 +241,70 @@ export default function EventPage() {
                     rel="noopener noreferrer"
                   >
                     <Image
-                      src="/mapa.png"
-                      alt="Mapa do Clube Atlético Piracicabano"
-                      width={800}
-                      height={400}
-                      className="h-full w-full object-cover"
+                      src="/google-maps.png"
+                      alt="Google Maps"
+                      width={1272}
+                      height={717}
+                      className="object-cover"
                     />
                   </a>
                 </div>
               </div>
             </section>
+
+            <section className="bg-black/20 p-4 sm:p-6 rounded-lg backdrop-blur-sm">
+              <SectionTitle>Tipos de Convites</SectionTitle>
+              <div className="grid gap-6 md:grid-cols-3">
+                <Card className="bg-black/40 border-white/10 p-4 backdrop-blur-sm">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span className="text-yellow-400">🎫</span>
+                      Convite Unitário
+                    </h3>
+                    <ul className="space-y-2 text-gray-300 text-sm">
+                      <li>• Entrada individual para uma pessoa</li>
+                      <li>• Opção de adquirir mesa e estacionamento (sujeito a disponibilidade)</li>
+                    </ul>
+                  </div>
+                </Card>
+
+                <Card className="bg-black/40 border-white/10 p-4 backdrop-blur-sm">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span className="text-yellow-400">🎫🎫</span>
+                      Convite Casal
+                    </h3>
+                    <ul className="space-y-2 text-gray-300 text-sm">
+                      <li>• Entrada para duas pessoas</li>
+                      <li>• Desconto em relação a dois convites unitários</li>
+                      <li>• Opção de adquirir mesa e estacionamento (sujeito a disponibilidade)</li>
+                    </ul>
+                  </div>
+                </Card>
+
+                <Card className="bg-black/40 border-white/10 p-4 backdrop-blur-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-black px-3 py-1 text-xs font-bold">
+                    PREMIUM
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span className="text-yellow-400">⭐</span>
+                      Convite Camarote
+                    </h3>
+                    <ul className="space-y-2 text-gray-300 text-sm">
+                      <li>• Entrada para quatro pessoas</li>
+                      <li>• Mesa exclusiva inclusa em área privilegiada</li>
+                      <li>• Localização premium com melhor visão do evento</li>
+                      <li>• Opção de adquirir estacionamento (sujeito a disponibilidade)</li>{" "}
+                    </ul>
+                  </div>
+                </Card>
+              </div>
+            </section>
           </div>
 
           {/* Ticket Sidebar */}
-          <div id="ticket-section" className="lg:sticky lg:top-24 space-y-6">
+          <div id="ticket-section">
             <TicketSidebar />
           </div>
         </div>
@@ -243,3 +312,4 @@ export default function EventPage() {
     </div>
   )
 }
+

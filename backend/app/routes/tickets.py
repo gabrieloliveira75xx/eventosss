@@ -5,6 +5,7 @@ from app.config import TICKET_PRICE, MERCADO_PAGO_ACCESS_TOKEN
 import mercadopago
 from bson import ObjectId
 import logging
+import httpx  # Adicionando httpx para integração com o Mercado Libre
 
 router = APIRouter()
 
@@ -93,3 +94,19 @@ async def get_purchase(purchase_id: str):
         raise HTTPException(status_code=404, detail="Purchase not found")
     purchase["_id"] = str(purchase["_id"])  # Convert ObjectId to string
     return purchase
+
+# Novo endpoint para buscar as informações de tracking do Mercado Libre
+@router.get("/api/mercadolibre-tracks")
+async def get_mercadolibre_tracks():
+    try:
+        # Realiza a requisição para a API do Mercado Livre
+        url = "https://api.mercadolibre.com/tracks"  # A URL da API do Mercado Libre
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                return response.json()  # Retorna a resposta da API do Mercado Libre
+            else:
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch data from Mercado Libre")
+    except Exception as e:
+        logger.error(f"Error fetching Mercado Libre tracks: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

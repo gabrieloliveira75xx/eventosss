@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useState, useCallback } from "react"
 
 declare global {
   interface Window {
@@ -10,45 +10,84 @@ declare global {
 
 export function useMercadoPago(publicKey: string) {
   const [isLoaded, setIsLoaded] = useState(false)
-  const mpRef = useRef<any>(null)
+  const [mp, setMp] = useState<any>(null)
 
   useEffect(() => {
-    if (typeof window === "undefined") return // Check if we're on the client side
-
-    if (isLoaded || document.getElementById("mercado-pago-script")) return
-
     const script = document.createElement("script")
     script.src = "https://sdk.mercadopago.com/js/v2"
-    script.async = true
-    script.id = "mercado-pago-script"
+    script.type = "text/javascript"
     script.onload = () => {
-      if (window.MercadoPago) {
-        mpRef.current = new window.MercadoPago(publicKey, {
-          locale: "pt-BR",
-        })
-        setIsLoaded(true)
-      } else {
-        console.error("Falha ao carregar o MercadoPago.")
-      }
+      const mp = new window.MercadoPago(publicKey)
+      setMp(mp)
+      setIsLoaded(true)
     }
     document.body.appendChild(script)
 
     return () => {
-      // Cleanup function to remove the script when the component unmounts
-      const scriptElement = document.getElementById("mercado-pago-script")
-      if (scriptElement) {
-        document.body.removeChild(scriptElement)
-      }
+      document.body.removeChild(script)
     }
-  }, [isLoaded, publicKey])
+  }, [publicKey])
 
-  const initializeBrick = (containerId: string, options: any) => {
-    if (!isLoaded || !mpRef.current) return
+  const initializeBrick = useCallback(
+    (containerId: string, options: any) => {
+      if (!mp) return
 
-    const bricksBuilder = mpRef.current.bricks()
-    bricksBuilder.create("payment", containerId, options)
-  }
+      const maxRetries = 5
+      const retryInterval = 1000 // 1 second
 
-  return { isLoaded, mpRef, initializeBrick }
+      const attemptInitialization = (attempt = 0) => {
+        try {
+          const container = document.getElementById(containerId)
+          if (!container) {
+            throw new Error(`Container ${containerId} not found`)
+          }
+          return mp.bricks().create("payment", containerId, options)
+        } catch (error) {
+          console.error(`Attempt ${attempt + 1} failed:`, error)
+          if (attempt < maxRetries) {
+            setTimeout(() => attemptInitialization(attempt + 1), retryInterval)
+          } else {
+            console.error(`Failed to initialize brick after ${maxRetries} attempts`)
+            throw error
+          }
+        }
+      }
+
+      return attemptInitialization()
+    },
+    [mp],
+  )
+
+  const initializeStatusScreen = useCallback(
+    (containerId: string, options: any) => {
+      if (!mp) return
+
+      const maxRetries = 5
+      const retryInterval = 1000 // 1 second
+
+      const attemptInitialization = (attempt = 0) => {
+        try {
+          const container = document.getElementById(containerId)
+          if (!container) {
+            throw new Error(`Container ${containerId} not found`)
+          }
+          return mp.bricks().create("statusScreen", containerId, options)
+        } catch (error) {
+          console.error(`Attempt ${attempt + 1} failed:`, error)
+          if (attempt < maxRetries) {
+            setTimeout(() => attemptInitialization(attempt + 1), retryInterval)
+          } else {
+            console.error(`Failed to initialize status screen after ${maxRetries} attempts`)
+            throw error
+          }
+        }
+      }
+
+      return attemptInitialization()
+    },
+    [mp],
+  )
+
+  return { isLoaded, mp, initializeBrick, initializeStatusScreen }
 }
 

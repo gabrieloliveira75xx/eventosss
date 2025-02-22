@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { initiatePurchase, selectTable } from "@/lib/api"
+import { initiatePurchase, createCreditCardPayment, createDebitCardPayment, createPixPayment, selectTable, fetchTables } from "@/lib/api"
 import { useMercadoPago } from "@/hooks/useMercadoPago"
 import { logError } from "@/lib/logger"
 import { useSearchParams } from "next/navigation"
@@ -16,13 +16,14 @@ interface FormData {
   name: string
   sobrenome: string
   telefone: string
-  conviteType: "unitario" | "casal" | "camarote"
+  email: string
+  conviteType: "unitario" | "casal"
   mesa: boolean
   estacionamento: boolean
 }
 
 interface CompraIngressosProps {
-  initialConviteType?: "unitario" | "casal" | "camarote"
+  initialConviteType?: "unitario" | "casal"
   mesa: boolean
   estacionamento: boolean
   total: number
@@ -38,6 +39,7 @@ export function CompraIngressos({
     nome: "",
     sobrenome: "",
     telefone: "",
+    email: "",
     conviteType: initialConviteType,
     mesa,
     estacionamento,
@@ -55,17 +57,16 @@ export function CompraIngressos({
   const [isTableModalOpen, setIsTableModalOpen] = useState(false)
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [availableTables, setAvailableTables] = useState<any[]>([])
-  const [showPaymentForm, setShowPaymentForm] = useState(true)
 
   const { isLoaded, initializeBrick, mp } = useMercadoPago("TEST-b8b8ec68-c42f-4b50-8ecf-691cd87f35b5")
 
   useEffect(() => {
-    const external_reference = searchParams.get("external_reference")
-    if (external_reference) {
-      setPurchaseId(external_reference)
+    const payment_id = searchParams.get("payment_id")
+    if (payment_id && isLoaded) {
+      setPaymentId(payment_id)
       setShowStatusScreen(true)
     }
-  }, [searchParams])
+  }, [searchParams, isLoaded])
 
   useEffect(() => {
     if (isLoaded && showPaymentSection && brickContainerRef.current) {
@@ -77,33 +78,17 @@ export function CompraIngressos({
             debitCard: "all",
             atm: "all",
             bankTransfer: "all",
-            pix: "all", // Garante que PIX está disponível
             maxInstallments: 12,
           },
         },
         callbacks: {
           onReady: () => {
-            console.log("Payment Brick pronto")
+            console.log("Payment Brick ready")
             setIsLoading(false)
           },
-          onSubmit: async (paymentData) => {
-            console.log("Dados do pagamento:", paymentData)
-
-            const paymentMethod = paymentData.formData.payment_method_id
-
-            // Passar o payment_id para cada pagamento
-            const externalReference = paymentId || paymentData.formData.external_reference || "Referência externa"
-
-            if (paymentMethod === "pix") {
-              return createPixPayment(paymentData, externalReference)
-            } else if (paymentMethod === "debit_card") {
-              return createDebitCardPayment(paymentData, externalReference)
-            } else {
-              return createCreditCardPayment(paymentData, externalReference)
-            }
-          },
+          onSubmit: handlePaymentSubmit,
           onError: (error: any) => {
-            console.error("Erro no Payment Brick:", error)
+            console.error("Payment Brick error:", error)
             logError("Erro do Payment Brick", error)
             setError("Ocorreu um erro ao processar o pagamento. Por favor, tente novamente.")
             setErrorDetails(JSON.stringify(error, null, 2))
@@ -117,7 +102,7 @@ export function CompraIngressos({
         },
       })
     }
-  }, [isLoaded, showPaymentSection, paymentAmount, initializeBrick, paymentId])
+  }, [isLoaded, showPaymentSection, paymentAmount, initializeBrick])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -129,6 +114,9 @@ export function CompraIngressos({
       const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
       const lettersOnly = capitalizedValue.replace(/[^a-zA-Z]/g, "")
       setFormData((prev) => ({ ...prev, [name]: lettersOnly }))
+    } else if (name === "email") {
+      const emailValue = value.toLowerCase()
+      setFormData((prev) => ({ ...prev, [name]: emailValue }))
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }))
     }
@@ -171,125 +159,91 @@ export function CompraIngressos({
       setIsLoading(false)
     }
   }
-
-  // Função para criar pagamento via cartão de crédito
-  const createCreditCardPayment = async (paymentData) => {
+  const handlePaymentSubmit = async (cardFormData: any) => {
+    setIsLoading(true)
+    setError(null)
+    setErrorDetails(null)
     try {
-      const adjustedPaymentData = {
-        payment_method_id: paymentData.formData.payment_method_id,
-        token: paymentData.formData.token,
-        transaction_amount: paymentData.formData.transaction_amount,
-        external_reference: purchaseId, // Adicionado aqui
-        installments: paymentData.formData.installments,
-        statement_descriptor: paymentData.formData.statement_descriptor || "Compra Evento",
-        payer: {
-          email: paymentData.formData.payer.email,
-          identification: paymentData.formData.payer.identification,
-          first_name: paymentData.formData.payer.first_name || "",
-          last_name: paymentData.formData.payer.last_name || "",
-        },
+      if (!purchaseId) {
+        throw new Error("Compra não iniciada corretamente.")
       }
-
-      const response = await fetch("/api/criar-pagamento-cartao-credito", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adjustedPaymentData),
+  
+      if (!cardFormData || Object.keys(cardFormData).length === 0) {
+        throw new Error("Dados do cartão não fornecidos.")
+      }
+  
+      console.log("Dados do cartão recebidos:", cardFormData)
+  
+      // Criação do paymentData, agora com segurança de 'payer'
+      const paymentData: any = {
+        ...formData,
+        transaction_amount: paymentAmount,
+        description: `Convite para ${formData.nome} ${formData.sobrenome}`,
+        purchase_id: purchaseId,
+        payment_method_id: cardFormData.payment_method_id,
+        installments: cardFormData.installments,
+        token: cardFormData.token,
+        email: cardFormData.payer?.email || "gabrieloliveira80xx@gmail.com", // Garantir email vazio caso 'payer' não exista
+      }
+  
+      // Verificação de 'payer' antes de adicionar ao 'paymentData'
+      if (cardFormData.payer) {
+        console.log("Payer encontrado:", cardFormData.payer)  // Exibir para verificar os dados do 'payer'
+        paymentData.payer = {
+          first_name: formData.nome,        // Adiciona o nome do pagador
+          last_name: formData.sobrenome,    // Adiciona o sobrenome do pagador
+          email: cardFormData.payer.email,  // Email do pagador
+          identification: {
+            type: cardFormData.payer.identification.type,
+            number: cardFormData.payer.identification.number,
+          },
+        }
+      } else {
+        console.warn("Dados de 'payer' não encontrados. Verifique os dados de entrada.")
+      }
+  
+      console.log("Iniciando pagamento:", paymentData)
+  
+      const result = await createCreditCardPayment(paymentData)
+      console.log("Resposta do createPayment:", result)
+  
+      if (!result.payment_id) {
+        throw new Error("Payment ID não retornado pelo servidor.")
+      }
+  
+      setPaymentId(result.payment_id)
+      setShowPaymentSection(false)
+      setShowStatusScreen(true)
+    } catch (error: any) {
+      console.error("Erro ao finalizar o pagamento:", error)
+      let errorMessage = "O pagamento não foi aprovado. Por favor, tente novamente."
+      let errorDetails = null
+  
+      if (error.message.startsWith("Validation error:")) {
+        errorMessage = "Erro de validação nos dados do pagamento:"
+        errorDetails = error.message.substring("Validation error:".length).trim()
+      } else if (error.response) {
+        console.error("Resposta de erro:", error.response.data)
+        errorMessage = error.response.data.message || errorMessage
+        errorDetails = JSON.stringify(error.response.data, null, 2)
+      }
+  
+      logError("Erro de Pagamento", {
+        error: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        formData,
+        cardFormData,
+        purchaseId,
+        paymentAmount,
       })
-
-      if (!response.ok) {
-        throw new Error("Falha na requisição do pagamento")
-      }
-
-      const data = await response.json()
-      if (data.status === "approved" || data.status === "in_process") {
-        setShowStatusScreen(true)
-      }
-      return data
-    } catch (error) {
-      console.error("Erro ao criar pagamento com cartão de crédito:", error)
-      throw new Error("Erro ao processar pagamento")
+      setError(errorMessage)
+      setErrorDetails(errorDetails)
+    } finally {
+      setIsLoading(false)
     }
   }
-
-  // Função para criar pagamento via cartão de débito
-  const createDebitCardPayment = async (paymentData) => {
-    try {
-      const adjustedPaymentData = {
-        payment_method_id: "debit_card",
-        token: paymentData.formData.token,
-        transaction_amount: paymentData.formData.transaction_amount,
-        external_reference: purchaseId, // Adicionado aqui
-        installments: paymentData.formData.installments,
-        statement_descriptor: paymentData.formData.statement_descriptor || "Compra Evento",
-        payer: {
-          email: paymentData.formData.payer.email,
-          identification: paymentData.formData.payer.identification,
-          first_name: paymentData.formData.payer.first_name || "",
-          last_name: paymentData.formData.payer.last_name || "",
-        },
-      }
-
-      const response = await fetch("/api/criar-pagamento-cartao-debito", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adjustedPaymentData),
-      })
-
-      if (!response.ok) {
-        throw new Error("Falha na requisição do pagamento")
-      }
-
-      const data = await response.json()
-      if (data.status === "approved" || data.status === "in_process") {
-        setShowStatusScreen(true)
-      }
-      return data
-    } catch (error) {
-      console.error("Erro ao criar pagamento com cartão de débito:", error)
-      throw new Error("Erro ao processar pagamento")
-    }
-  }
-
-  // Função para criar pagamento via PIX
-  const createPixPayment = async (paymentData) => {
-    try {
-      const adjustedPaymentData = {
-        payment_method_id: "pix",
-        transaction_amount: paymentData.formData.transaction_amount,
-        external_reference: purchaseId,
-        notification_url: "https://eventos.grupoglk.com.br/status",
-        payer: {
-          email: paymentData.formData.payer.email,
-          identification: paymentData.formData.payer.identification,
-          first_name: paymentData.formData.payer.first_name || "",
-          last_name: paymentData.formData.payer.last_name || "",
-        },
-      }
-
-      const response = await fetch("/api/criar-pagamento-pix", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(adjustedPaymentData),
-      })
-
-      if (!response.ok) {
-        throw new Error("Falha na requisição do pagamento")
-      }
-
-      const data = await response.json()
-      if (data.status === "pending") {
-        setShowStatusScreen(true)
-      }
-      return data
-    } catch (error) {
-      console.error("Erro ao criar pagamento via PIX:", error)
-      setError("Erro ao processar pagamento PIX. Por favor, tente novamente.")
-      throw error
-    }
-  }
-
+  
   const handleTableSelect = async (tableId: string) => {
     setSelectedTable(tableId)
     setIsTableModalOpen(false)
@@ -297,6 +251,7 @@ export function CompraIngressos({
     if (purchaseId) {
       try {
         await selectTable(tableId, purchaseId)
+        // Optionally, update the UI to reflect the selected table
       } catch (error) {
         console.error("Error selecting table:", error)
         setError("Erro ao selecionar mesa. Por favor, tente novamente.")
@@ -304,17 +259,11 @@ export function CompraIngressos({
     }
   }
 
-  const isFormValid = formData.nome && formData.sobrenome && formData.telefone.length >= 13
-
-  useEffect(() => {
-    if (paymentId) {
-      setShowStatusScreen(true)
-    }
-  }, [paymentId])
+  const isFormValid = formData.nome && formData.sobrenome && formData.telefone && formData.email
 
   return (
     <div className="space-y-6 max-w-md mx-auto">
-      {!showStatusScreen && showPaymentForm && (
+      {!showStatusScreen ? (
         <>
           <h2 className="text-2xl font-bold">Compre seu convite</h2>
           <form className="space-y-4">
@@ -327,6 +276,7 @@ export function CompraIngressos({
               onChange={handleInputChange}
               type="tel"
             />
+            <InputField label="Email" name="email" value={formData.email} onChange={handleInputChange} type="email" />
           </form>
           {formData.mesa && (
             <Button onClick={() => setIsTableModalOpen(true)} className="w-full">
@@ -349,6 +299,8 @@ export function CompraIngressos({
             selectedTable={selectedTable}
           />
         </>
+      ) : (
+        <StatusScreenBrick paymentId={paymentId!} />
       )}
 
       {error && (
@@ -362,7 +314,6 @@ export function CompraIngressos({
           )}
         </div>
       )}
-      {showStatusScreen && purchaseId && <StatusScreenBrick purchaseId={purchaseId} />}
     </div>
   )
 }
@@ -382,4 +333,3 @@ const InputField = ({ label, name, value, onChange, type = "text" }) => (
     />
   </div>
 )
-

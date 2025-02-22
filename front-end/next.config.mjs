@@ -1,21 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    reactStrictMode: false, // Desabilita o modo estrito do React
     webpack(config, { isServer }) {
-      // Ignora certos erros de Webpack
-      config.ignoreWarnings = [
-        (warning) =>
-          warning.module?.resource?.includes('node_modules') && // Ignora erros de pacotes node_modules
-          warning.message.includes('Critical dependency'),
-      ];
-  
+      // A configuração `devtool` deve ser uma string válida de acordo com o padrão
+      if (!isServer) {
+        config.devtool = 'source-map'; // Usa 'source-map' para produção, se necessário
+      }
       return config;
     },
     typescript: {
-      ignoreBuildErrors: true, // Ignora erros de TypeScript no build
+      ignoreBuildErrors: true, // Ignora erros de TypeScript durante o build
     },
     eslint: {
-      ignoreDuringBuilds: true, // Ignora erros de ESLint durante o build
+      ignoreDuringBuilds: true, // Ignora erros de ESLint durante a construção
     },
   };
   

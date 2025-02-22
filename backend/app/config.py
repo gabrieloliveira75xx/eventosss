@@ -3,8 +3,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGODB_URL = os.getenv("MONGODB_URL")
-DATABASE_NAME = os.getenv("DATABASE_NAME")
+MONGO_URL = os.getenv("MONGO_URL")
+DATABASE_NAME = os.getenv("DATABASE_NAME", "eventos_db")
 MERCADO_PAGO_ACCESS_TOKEN = os.getenv("MERCADO_PAGO_ACCESS_TOKEN")
+FRONTEND_URL = os.getenv("FRONTEND_URL")
 
-TICKET_PRICE = 20  # Price per ticket in the smallest currency unit (e.g., cents)   
+# Pricing constants
+CONVITE_UNITARIO_PRICE = 2500  # R$25.00 in cents
+CONVITE_CASAL_PRICE = 4000  # R$40.00 in cents
+MESA_PRICE = 2000  # R$20.00 in cents
+ESTACIONAMENTO_PRICE = 2000  # R$20.00 in cents
