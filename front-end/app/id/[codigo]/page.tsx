@@ -11,8 +11,10 @@ export default function VendedorPage({ params }: { params: { codigo: string } })
 
   useEffect(() => {
     if (params.codigo) {
+      // Define o vendedor diretamente sem validação
       setVendedor(params.codigo)
     } else {
+      // Redireciona para a página inicial se não houver código
       router.push("/")
     }
   }, [params.codigo, setVendedor, router])

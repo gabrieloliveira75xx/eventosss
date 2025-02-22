@@ -1,105 +1,149 @@
-import axios from "axios"
+import axios from 'axios';
 
-const api = axios.create({
-  baseURL: "https://eventos.grupoglk.com.br/api",
-})
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://eventos.grupoglk.com.br';
 
-// Função para iniciar a compra
-export const initiatePurchase = async (purchaseData: any) => {
-  try {
-    const response = await api.post("/iniciar-compra", purchaseData)
-    return response.data
-  } catch (error) {
-    console.error("Error initiating purchase:", error)
-    throw error
-  }
-}
-
-// Funções para criação de pagamento
-
-// Pagamento via cartão de crédito
-export const createCreditCardPayment = async (paymentData: any, purchaseId: string) => {
-  try {
-    const response = await api.post("/criar-pagamento-cartao-credito", {
-      ...paymentData,
-      external_reference: purchaseId,
-    })
-    return response.data
-  } catch (error) {
-    console.error("Erro ao criar pagamento com cartão de crédito:", error)
-    if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message || "Erro ao criar pagamento com cartão de crédito")
-    }
-    throw error
-  }
-}
-
-// Pagamento via cartão de débito
-export const createDebitCardPayment = async (paymentData: any, purchaseId: string) => {
-  try {
-    const response = await api.post("/criar-pagamento-cartao-debito", {
-      ...paymentData,
-      external_reference: purchaseId,
-    })
-    return response.data
-  } catch (error) {
-    console.error("Erro ao criar pagamento com cartão de débito:", error)
-    if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message || "Erro ao criar pagamento com cartão de débito")
-    }
-    throw error
-  }
-}
-
-  // Pagamento via PIX
-  export const createPixPayment = async (paymentData: any, purchaseId: string) => {
+// Table Management Endpoints
+export const getTables = async () => {
     try {
-      const response = await api.post("/criar-pagamento-pix", {
-        ...paymentData,
-        external_reference: purchaseId,
-      })
-      return response.data
+        const response = await axios.get(`${API_BASE_URL}/api/tables`);
+        return response.data;
     } catch (error) {
-      console.error("Erro ao criar pagamento com PIX:", error)
-      if (axios.isAxiosError(error) && error.response) {
-        throw new Error(error.response.data.message || "Erro ao criar pagamento com PIX")
-      }
-      throw error
+        console.error('Error fetching tables:', error);
+        throw error;
     }
-  }
+};
 
-// Função para verificar o status da compra
-export const checkPurchaseStatus = async (purchaseId: string) => {
-  try {
-    const response = await api.get(`/status-compra/${purchaseId}`)
-    return response.data
-  } catch (error) {
-    console.error("Error checking purchase status:", error)
-    throw error
-  }
-}
-
-// Novas funções para seleção de mesas
-
-export const fetchTables = async () => {
-  try {
-    const response = await api.get("/tables")
-    return response.data
-  } catch (error) {
-    console.error("Error fetching tables:", error)
-    throw error
-  }
-}
-
-export const selectTable = async (tableId: string, purchaseId: string) => {
-  try {
-    const response = await api.post("/select-table", { tableId, purchaseId })
-    return response.data
-  } catch (error) {
-    console.error("Error selecting table:", error)
-    if (axios.isAxiosError(error) && error.response) {
-      throw new Error(error.response.data.message || "Erro ao selecionar mesa")
+export const getAvailableTables = async (type?: string) => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/api/tables/available`, {
+            params: { type }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching available tables:', error);
+        throw error;
     }
-    throw error
-  }
-}
+};
+
+export const reserveTable = async (tableId: string, reservation: { table_id: string, purchase_id: string }) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/tables/${tableId}/reserve`, reservation);
+        return response.data;
+    } catch (error) {
+        console.error('Error reserving table:', error);
+        throw error;
+    }
+};
+
+// Purchase and Payment Endpoints
+export const iniciarCompra = async (purchase: {
+    nome: string,
+    sobrenome: string,
+    telefone: string,
+    conviteType: string,
+    mesa: boolean,
+    estacionamento: boolean,
+    amount: number,
+    vendedor_code?: string
+}) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/iniciar-compra`, purchase);
+        return response.data;
+    } catch (error) {
+        console.error('Error initiating purchase:', error);
+        throw error;
+    }
+};
+
+export const criarPagamentoCartaoCredito = async (paymentData: {
+    payment_method_id: string,
+    token: string,
+    transaction_amount: number,
+    payer: { first_name: string, last_name: string },
+    statement_descriptor: string,
+    external_reference: string,
+    vendedor_code?: string // Adicionado vendedor_code
+}) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/criar-pagamento-cartao-credito`, paymentData);
+        return response.data;
+    } catch (error) {
+        console.error('Error creating credit card payment:', error);
+        throw error;
+    }
+};
+
+export const criarPagamentoCartaoDebito = async (paymentData: {
+    payment_method_id: string,
+    token: string,
+    transaction_amount: number,
+    payer: { first_name: string, last_name: string },
+    statement_descriptor: string,
+    external_reference: string,
+    vendedor_code?: string // Adicionado vendedor_code
+}) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/criar-pagamento-cartao-debito`, paymentData);
+        return response.data;
+    } catch (error) {
+        console.error('Error creating debit card payment:', error);
+        throw error;
+    }
+};
+
+export const criarPagamentoPix = async (paymentData: {
+    payment_method_id: string,
+    transaction_amount: number,
+    payer: { first_name: string, last_name: string },
+    external_reference: string,
+    notification_url: string,
+    vendedor_code?: string // Adicionado vendedor_code
+}) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/criar-pagamento-pix`, paymentData);
+        return response.data;
+    } catch (error) {
+        console.error('Error creating PIX payment:', error);
+        throw error;
+    }
+};
+
+export const statusCompra = async (externalReference: string) => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/api/status-compra/${externalReference}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error checking purchase status:', error);
+        throw error;
+    }
+};
+
+// Vendor Sales Endpoints
+export const registrarVenda = async (vendedorCode: string, paymentInfo: {
+    id: string,
+    external_reference: string,
+    transaction_amount: number,
+    status: string
+}) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/registrar-venda`, {
+            vendedor_code: vendedorCode,
+            payment_info: paymentInfo
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error registering sale:', error);
+        throw error;
+    }
+};
+
+// Mercado Pago Webhook
+export const mercadopagoWebhook = async (payload: any) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/api/webhook`, payload);
+        return response.data;
+    } catch (error) {
+        console.error('Error processing Mercado Pago webhook:', error);
+        throw error;
+    }
+};

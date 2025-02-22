@@ -36,7 +36,9 @@ export const metadata = {
     card: "summary_large_image",
     title: "Clube Atlético Piracicabano - Evento Anos 70/80/90/2000",
     description: "Evento no Clube Atlético Piracicabano com DJs Guto Loureiro, Paulo Oexler e Zangão.",
-    images: ["/logo-glk.png"],
+    openGraph: {
+      images: ["/logo-glk.png"],
+    },
   },
 }
 

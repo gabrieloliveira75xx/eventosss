@@ -22,7 +22,7 @@ export function TableSelectionModal({
   conviteType = "unitario",
 }: TableSelectionModalProps) {
   const [hoveredTable, setHoveredTable] = useState<string | null>(null)
-  const [scale, setScale] = useState(0.8) // Iniciando com zoom mais afastado
+  const [scale, setScale] = useState(0.7) // Iniciando com zoom mais afastado
 
   const isTableAvailable = (tableId: string) => {
     const numId = Number(tableId)
@@ -132,7 +132,7 @@ export function TableSelectionModal({
               </div>
 
               {/* Center Area with PISTA text */}
-              <div className="text-5xl font-normal text-center mb-8">PISTA</div>
+              <div className="text-5xl font-normal text-center mb-4">PISTA</div>
 
               {/* Regular Tables */}
               <div className="space-y-12">

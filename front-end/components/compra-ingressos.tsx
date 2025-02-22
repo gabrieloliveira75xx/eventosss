@@ -5,20 +5,27 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { initiatePurchase, selectTable } from "@/lib/api"
 import { useMercadoPago } from "@/hooks/useMercadoPago"
 import { logError } from "@/lib/logger"
 import { useSearchParams } from "next/navigation"
 import { StatusScreenBrick } from "./status-screen-brick"
 import { TableSelectionModal } from "./table-selection-modal"
+import {
+  iniciarCompra,
+  criarPagamentoCartaoCredito,
+  criarPagamentoCartaoDebito,
+  criarPagamentoPix,
+  /// importar dpsselectTable,
+} from "@/lib/api"
 
 interface FormData {
-  name: string
+  nome: string
   sobrenome: string
   telefone: string
   conviteType: "unitario" | "casal" | "camarote"
   mesa: boolean
   estacionamento: boolean
+  vendedorCode?: string // Adicionado vendedorCode ao FormData
 }
 
 interface CompraIngressosProps {
@@ -26,6 +33,7 @@ interface CompraIngressosProps {
   mesa: boolean
   estacionamento: boolean
   total: number
+  vendedorCode?: string // Adicionado vendedorCode às props
 }
 
 export function CompraIngressos({
@@ -33,6 +41,7 @@ export function CompraIngressos({
   mesa,
   estacionamento,
   total,
+  vendedorCode, // Recebendo vendedorCode das props
 }: CompraIngressosProps) {
   const [formData, setFormData] = useState<FormData>({
     nome: "",
@@ -41,6 +50,7 @@ export function CompraIngressos({
     conviteType: initialConviteType,
     mesa,
     estacionamento,
+    vendedorCode, // Inicializando vendedorCode no estado
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,7 +96,7 @@ export function CompraIngressos({
             console.log("Payment Brick pronto")
             setIsLoading(false)
           },
-          onSubmit: async (paymentData) => {
+          onSubmit: async (paymentData: any) => {
             console.log("Dados do pagamento:", paymentData)
 
             const paymentMethod = paymentData.formData.payment_method_id
@@ -95,11 +105,11 @@ export function CompraIngressos({
             const externalReference = paymentId || paymentData.formData.external_reference || "Referência externa"
 
             if (paymentMethod === "pix") {
-              return createPixPayment(paymentData, externalReference)
+              return createPixPayment(paymentData)
             } else if (paymentMethod === "debit_card") {
-              return createDebitCardPayment(paymentData, externalReference)
+              return createDebitCardPayment(paymentData)
             } else {
-              return createCreditCardPayment(paymentData, externalReference)
+              return createCreditCardPayment(paymentData)
             }
           },
           onError: (error: any) => {
@@ -147,39 +157,43 @@ export function CompraIngressos({
   }
 
   const handleGoToPayment = async () => {
-    setIsLoading(true)
-    setError(null)
-    setErrorDetails(null)
+    setIsLoading(true);
+    setError(null);
+    setErrorDetails(null);
     try {
-      console.log("Iniciando compra:", { ...formData, amount: paymentAmount })
-      const { purchase_id, amount } = await initiatePurchase({ ...formData, amount: paymentAmount })
-      console.log("Compra iniciada:", { purchase_id, amount })
-
+      console.log("Iniciando compra:", { ...formData, amount: paymentAmount });
+      const { purchase_id, amount } = await iniciarCompra({
+        ...formData,
+        amount: paymentAmount,
+        vendedor_code: formData.vendedorCode, // Garantir que o vendedor_code seja passado
+      });
+      console.log("Compra iniciada:", { purchase_id, amount });
+  
       if (!purchase_id) {
-        throw new Error("ID da compra não retornado pelo servidor.")
+        throw new Error("ID da compra não retornado pelo servidor.");
       }
-
-      setPaymentAmount(amount)
-      setPurchaseId(purchase_id)
-      setShowPaymentSection(true)
+  
+      setPaymentAmount(amount);
+      setPurchaseId(purchase_id);
+      setShowPaymentSection(true);
     } catch (error: any) {
-      console.error("Erro ao iniciar a compra:", error)
-      logError("Erro ao Iniciar Compra", { error, formData, paymentAmount })
-      setError(error.response?.data?.message || "Ocorreu um erro ao iniciar a compra. Por favor, tente novamente.")
-      setErrorDetails(JSON.stringify(error, null, 2))
+      console.error("Erro ao iniciar a compra:", error);
+      logError("Erro ao Iniciar Compra", { error, formData, paymentAmount });
+      setError(error.response?.data?.message || "Ocorreu um erro ao iniciar a compra. Por favor, tente novamente.");
+      setErrorDetails(JSON.stringify(error, null, 2));
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Função para criar pagamento via cartão de crédito
-  const createCreditCardPayment = async (paymentData) => {
+  const createCreditCardPayment = async (paymentData: { formData: any }) => {
     try {
       const adjustedPaymentData = {
         payment_method_id: paymentData.formData.payment_method_id,
         token: paymentData.formData.token,
         transaction_amount: paymentData.formData.transaction_amount,
-        external_reference: purchaseId, // Adicionado aqui
+        external_reference: purchaseId || "", // Garantir que seja uma string
         installments: paymentData.formData.installments,
         statement_descriptor: paymentData.formData.statement_descriptor || "Compra Evento",
         payer: {
@@ -188,19 +202,10 @@ export function CompraIngressos({
           first_name: paymentData.formData.payer.first_name || "",
           last_name: paymentData.formData.payer.last_name || "",
         },
+        vendedor_code: formData.vendedorCode, // Passando vendedorCode
       }
 
-      const response = await fetch("/api/criar-pagamento-cartao-credito", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adjustedPaymentData),
-      })
-
-      if (!response.ok) {
-        throw new Error("Falha na requisição do pagamento")
-      }
-
-      const data = await response.json()
+      const data = await criarPagamentoCartaoCredito(adjustedPaymentData)
       if (data.status === "approved" || data.status === "in_process") {
         setShowStatusScreen(true)
       }
@@ -212,13 +217,13 @@ export function CompraIngressos({
   }
 
   // Função para criar pagamento via cartão de débito
-  const createDebitCardPayment = async (paymentData) => {
+  const createDebitCardPayment = async (paymentData: { formData: any }) => {
     try {
       const adjustedPaymentData = {
         payment_method_id: "debit_card",
         token: paymentData.formData.token,
         transaction_amount: paymentData.formData.transaction_amount,
-        external_reference: purchaseId, // Adicionado aqui
+        external_reference: purchaseId || "", // Garantir que seja uma string
         installments: paymentData.formData.installments,
         statement_descriptor: paymentData.formData.statement_descriptor || "Compra Evento",
         payer: {
@@ -227,19 +232,10 @@ export function CompraIngressos({
           first_name: paymentData.formData.payer.first_name || "",
           last_name: paymentData.formData.payer.last_name || "",
         },
+        vendedor_code: formData.vendedorCode, // Passando vendedorCode
       }
 
-      const response = await fetch("/api/criar-pagamento-cartao-debito", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adjustedPaymentData),
-      })
-
-      if (!response.ok) {
-        throw new Error("Falha na requisição do pagamento")
-      }
-
-      const data = await response.json()
+      const data = await criarPagamentoCartaoDebito(adjustedPaymentData)
       if (data.status === "approved" || data.status === "in_process") {
         setShowStatusScreen(true)
       }
@@ -251,12 +247,12 @@ export function CompraIngressos({
   }
 
   // Função para criar pagamento via PIX
-  const createPixPayment = async (paymentData) => {
+  const createPixPayment = async (paymentData: { formData: any }) => {
     try {
       const adjustedPaymentData = {
         payment_method_id: "pix",
         transaction_amount: paymentData.formData.transaction_amount,
-        external_reference: purchaseId,
+        external_reference: purchaseId || "",
         notification_url: "https://eventos.grupoglk.com.br/status",
         payer: {
           email: paymentData.formData.payer.email,
@@ -264,21 +260,10 @@ export function CompraIngressos({
           first_name: paymentData.formData.payer.first_name || "",
           last_name: paymentData.formData.payer.last_name || "",
         },
+        vendedor_code: formData.vendedorCode, // Passando vendedorCode
       }
 
-      const response = await fetch("/api/criar-pagamento-pix", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(adjustedPaymentData),
-      })
-
-      if (!response.ok) {
-        throw new Error("Falha na requisição do pagamento")
-      }
-
-      const data = await response.json()
+      const data = await criarPagamentoPix(adjustedPaymentData)
       if (data.status === "pending") {
         setShowStatusScreen(true)
       }
@@ -346,7 +331,7 @@ export function CompraIngressos({
             isOpen={isTableModalOpen}
             onClose={() => setIsTableModalOpen(false)}
             onTableSelect={handleTableSelect}
-            selectedTable={selectedTable}
+            selectedTable={selectedTable || undefined}
           />
         </>
       )}
@@ -357,17 +342,17 @@ export function CompraIngressos({
           {errorDetails && (
             <details>
               <summary>Detalhes do erro</summary>
-              <pre className="text-xs mt-2 bg-gray-100 p-2 rounded">{errorDetails}</pre>
+              <pre className="text-xs mt-2 bg-gray-100 p2 rounded">{errorDetails}</pre>
             </details>
           )}
         </div>
       )}
-      {showStatusScreen && purchaseId && <StatusScreenBrick purchaseId={purchaseId} />}
+      {showStatusScreen && purchaseId && <StatusScreenBrick purchaseId={purchaseId} amount={paymentAmount} />}
     </div>
   )
 }
 
-const InputField = ({ label, name, value, onChange, type = "text" }) => (
+const InputField = ({ label, name, value, onChange, type = "text" }: { label: string, name: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type?: string }) => (
   <div className="space-y-2">
     <Label htmlFor={name}>{label}</Label>
     <Input
@@ -382,4 +367,3 @@ const InputField = ({ label, name, value, onChange, type = "text" }) => (
     />
   </div>
 )
-

@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Info } from "lucide-react"
 import { TableSelectionModal } from "@/components/table-selection-modal"
 
+
 const CONVITE_UNITARIO_PRICE = 25.0
 const CONVITE_CASAL_PRICE = 40.0
 const CONVITE_CAMAROTE_PRICE = 200.0
@@ -17,6 +18,14 @@ const MESA_PRICE = 20.0
 const ESTACIONAMENTO_PRICE = 20.0
 
 type ConviteType = "unitario" | "casal" | "camarote"
+
+type CompraIngressosProps = {
+  conviteType: ConviteType
+  mesa: boolean
+  estacionamento: boolean
+  total: number
+  selectedTable: string | null
+}
 
 export function TicketSidebar() {
   const [conviteType, setConviteType] = useState<ConviteType | null>(null)
@@ -104,7 +113,7 @@ export function TicketSidebar() {
     </div>
   )
 
-  const TicketOption = ({ value, label, price, description }) => (
+  const TicketOption = ({ value, label, price, description }: { value: ConviteType, label: string, price: number, description: React.ReactNode }) => (
     <div className="flex items-center justify-between space-x-1 pl-1 pr-2 py-2 rounded hover:bg-gray-100">
       <div className="flex items-center space-x-2">
         <input
