@@ -1,74 +1,97 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 
 interface StatusScreenBrickProps {
-  purchaseId: string
+  purchaseId: string // This will be your external_reference
 }
 
 export const StatusScreenBrick: React.FC<StatusScreenBrickProps> = ({ purchaseId }) => {
-  const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
-  const [qrCodeData, setQrCodeData] = useState<string | null>(null)
+  const [paymentId, setPaymentId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  console.log(qrCodeData)
 
   useEffect(() => {
-    if (purchaseId) {
-      const fetchPaymentStatus = async () => {
-        try {
-          const response = await fetch(`/api/status-compra/${purchaseId}`)
-          const data = await response.json()
+    const fetchPaymentId = async () => {
+      try {
+        const response = await fetch(`/api/status-compra/${purchaseId}`)
+        const data = await response.json()
 
-          if (response.ok) {
-            setPaymentStatus(data.status)
-            setQrCodeData(data.qr_code_base64) // Recebe o QR Code se for PIX
-
-            // Se o pagamento estiver pendente, continuar verificando
-            if (data.status === "pending" || data.status === "in_process") {
-              setTimeout(fetchPaymentStatus, 5000) // Tenta novamente após 5 segundos
-            }
-          } else {
-            setError("Erro ao consultar status. Tente novamente.")
-          }
-        } catch (error) {
-          setError("Erro ao comunicar com o servidor.")
+        if (response.ok && data.payment_id) {
+          setPaymentId(data.payment_id)
+        } else {
+          setError("Erro ao buscar informações do pagamento")
         }
+      } catch (error) {
+        setError("Erro ao comunicar com o servidor")
+      }
+    }
+
+    fetchPaymentId()
+  }, [purchaseId])
+
+  useEffect(() => {
+    if (!paymentId) return
+
+    // Load Mercado Pago SDK
+    const script = document.createElement("script")
+    script.src = "https://sdk.mercadopago.com/js/v2"
+    script.type = "text/javascript"
+    document.body.appendChild(script)
+
+    script.onload = () => {
+      const mp = new window.MercadoPago(process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY!, {
+        locale: "pt-BR",
+      })
+
+      const bricksBuilder = mp.bricks()
+
+      const renderStatusScreenBrick = async () => {
+        const settings = {
+          initialization: {
+            paymentId: paymentId,
+          },
+          callbacks: {
+            onReady: () => {
+              console.log("Status Screen Brick ready")
+            },
+            onError: (error: any) => {
+              console.error("Error loading Status Screen Brick:", error)
+              setError("Erro ao carregar status do pagamento")
+            },
+          },
+        }
+
+        await bricksBuilder.create("statusScreen", "statusScreenBrick", settings)
       }
 
-      fetchPaymentStatus()
+      renderStatusScreenBrick()
     }
-  }, [purchaseId])
+
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [paymentId])
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-red-500">{error}</div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
-      <CardContent>
-        <h2>Status do Pagamento</h2>
-        {paymentStatus ? (
-          <>
-            <p>
-              Status da compra: <strong>{paymentStatus}</strong>
-            </p>
-            {qrCodeData && (
-              <div>
-                <h3>Escaneie o QR Code para finalizar o pagamento:</h3>
-                <img src={`data:image/jpg;base64,${qrCodeData}`} alt="QR Code" />
-              </div>
-            )}
-
- {!qrCodeData && (<p>Gerando QR-Code</p>)} 
-            {paymentStatus === "approved" && <p style={{ color: "green" }}>Pagamento aprovado! 🎉</p>}
-            {paymentStatus === "rejected" && <p style={{ color: "red" }}>Pagamento recusado. Tente novamente.</p>}
-          </>
+      <CardContent className="p-6">
+        {!paymentId ? (
+          <div>Carregando informações do pagamento...</div>
         ) : (
-          <p>Buscando status...</p>
+          <div id="statusScreenBrick"></div>
         )}
-        {error && <p style={{ color: "red" }}>{error}</p>}
-        {error && <Button onClick={() => window.location.reload()}>Tentar novamente</Button>}
       </CardContent>
     </Card>
   )
 }
-
