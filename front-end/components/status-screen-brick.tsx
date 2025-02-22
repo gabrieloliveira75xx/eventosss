@@ -13,6 +13,7 @@ export const StatusScreenBrick: React.FC<StatusScreenBrickProps> = ({ purchaseId
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  console.log(qrCodeData)
 
   useEffect(() => {
     if (purchaseId) {
@@ -23,7 +24,7 @@ export const StatusScreenBrick: React.FC<StatusScreenBrickProps> = ({ purchaseId
 
           if (response.ok) {
             setPaymentStatus(data.status)
-            setQrCodeData(data.qr_code || null) // Recebe o QR Code se for PIX
+            setQrCodeData(data.qr_code_base64) // Recebe o QR Code se for PIX
 
             // Se o pagamento estiver pendente, continuar verificando
             if (data.status === "pending" || data.status === "in_process") {
@@ -53,9 +54,11 @@ export const StatusScreenBrick: React.FC<StatusScreenBrickProps> = ({ purchaseId
             {qrCodeData && (
               <div>
                 <h3>Escaneie o QR Code para finalizar o pagamento:</h3>
-                <img src={`data:image/png;base64,${qrCodeData}`} alt="QR Code" />
+                <img src={`data:image/jpg;base64,${qrCodeData}`} alt="QR Code" />
               </div>
             )}
+
+ {!qrCodeData && (<p>Gerando QR-Code</p>)} 
             {paymentStatus === "approved" && <p style={{ color: "green" }}>Pagamento aprovado! 🎉</p>}
             {paymentStatus === "rejected" && <p style={{ color: "red" }}>Pagamento recusado. Tente novamente.</p>}
           </>
